@@ -65,7 +65,10 @@ rule run_augustus_hints:
         overlap = config['augustus_overlap'],
         use_dev_shm = config['use_dev_shm'],
         allow_hinted_splicesites = config.get('allow_hinted_splicesites', 'gcag,atac'),
-        tmp_root = lambda w: "/dev/shm" if config['use_dev_shm'] else TMP_ROOT
+        tmp_root = lambda w: "/dev/shm" if config['use_dev_shm'] else TMP_ROOT,
+        # 1 = lowercase is repeat (normal BRAKER run). predict_unmasked.smk
+        # reuses this rule with 0 to predict on the same genome unmasked.
+        softmasking = 1
     threads: int(config['slurm_args']['cpus_per_task'])
     resources:
         mem_mb=int(config['slurm_args']['mem_of_node']),
@@ -181,7 +184,7 @@ rule run_augustus_hints:
             --joblist=$JOB_LST_ABS \
             --jobprefix=aug_hints_ \
             --partitionHints \
-            --command "augustus --species={params.species_name} --AUGUSTUS_CONFIG_PATH={params.aug_config} --extrinsicCfgFile=$EXTRINSIC_ABS --alternatives-from-evidence=true --UTR=off --exonnames=on --codingseq=on --allow_hinted_splicesites={params.allow_hinted_splicesites} --softmasking=1" \
+            --command "augustus --species={params.species_name} --AUGUSTUS_CONFIG_PATH={params.aug_config} --extrinsicCfgFile=$EXTRINSIC_ABS --alternatives-from-evidence=true --UTR=off --exonnames=on --codingseq=on --allow_hinted_splicesites={params.allow_hinted_splicesites} --softmasking={params.softmasking}" \
             2> $OUTPUT_DIR_ABS/createAugustusJoblist.err
 
         # Return to original directory

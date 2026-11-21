@@ -32,6 +32,15 @@ Mode-by-mode behavior in this rule mirrors braker.pl:
 """
 
 
+def unmasked_candidate_gtf(sample):
+    """AUGUSTUS predictions on the unmasked genome (predict_unmasked = 1), or
+    None. Only ETP-style modes pass AUGUSTUS through TSEBRA as a candidate set
+    that is filtered against the hints; in ES/EP/ET every AUGUSTUS gene is
+    kept, so unmasked predictions would enter unfiltered and are not used."""
+    if config.get('predict_unmasked', False) and get_braker_mode(sample) in ('etp', 'isoseq', 'dual'):
+        return f"output/{sample}/unmasked/augustus.hints.fixed.prefixed.gtf"
+    return None
+
 def get_tsebra_inputs(wildcards):
     """
     Mode-dependent inputs for the run_tsebra rule.
@@ -76,6 +85,10 @@ def get_tsebra_inputs(wildcards):
             "hintsfile":  get_augustus_hintsfile(sample),
         })
 
+    unmasked = unmasked_candidate_gtf(sample)
+    if unmasked:
+        inputs["unmasked_gtf"] = unmasked
+
     return with_mode_decisions(wildcards, inputs)
 
 
@@ -89,7 +102,9 @@ rule run_tsebra:
         "benchmarks/{sample}/run_tsebra/run_tsebra.txt"
     params:
         mode=lambda w: effective_mode_on_disk(w.sample),
-        filter_se=config['filter_single_exon_genes']
+        filter_se=config['filter_single_exon_genes'],
+        # ",<path>" when predict_unmasked = 1 (appended to the --gtf candidates)
+        extra_gtf=lambda w: ("," + unmasked_candidate_gtf(w.sample)) if unmasked_candidate_gtf(w.sample) else ""
     threads: 1
     resources:
         mem_mb=mem_single_thread,
@@ -137,9 +152,14 @@ rule run_tsebra:
                 GM_GENES=$(awk -F'\t' '$3=="CDS"' {input.genemark_gtf} | grep -oE 'gene_id "[^"]+"' | sort -u | wc -l)
                 KEEP_GENES=$(grep -oE 'gene_id "[^"]+"' {input.training_gtf} | sort -u | wc -l)
                 echo "[INFO] Inputs: AUGUSTUS=$AUG_GENES, GeneMark=$GM_GENES (candidates), training=$KEEP_GENES (forced)" | tee -a {output.tsebra_log}
+                if [ -n "{params.extra_gtf}" ]; then
+                    UNM_GTF="{params.extra_gtf}"; UNM_GTF=${{UNM_GTF#,}}
+                    UNM_GENES=$(awk '$3=="gene"{{n++}}END{{print n+0}}' "$UNM_GTF")
+                    echo "[INFO] Unmasked AUGUSTUS=$UNM_GENES (candidates, predict_unmasked = 1)" | tee -a {output.tsebra_log}
+                fi
 
                 tsebra.py \
-                    --gtf {input.augustus_gtf},{input.genemark_gtf} \
+                    --gtf {input.augustus_gtf},{input.genemark_gtf}{params.extra_gtf} \
                     --keep_gtf {input.training_gtf} \
                     --hintfiles {input.hintsfile} \
                     $FILTER_SE_ARG \

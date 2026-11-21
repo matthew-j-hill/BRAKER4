@@ -148,7 +148,9 @@ rule fix_in_frame_stop_codons:
         # used. Previously hardcoded to etp.cfg, which was wrong for ET and EP.
         extrinsic_cfg = lambda w: get_extrinsic_cfg(w),
         fix_stem = lambda w: f"output/{w.sample}/augustus.hints_fix_ifs_",
-        allow_hinted_splicesites = config.get('allow_hinted_splicesites', 'gcag,atac')
+        allow_hinted_splicesites = config.get('allow_hinted_splicesites', 'gcag,atac'),
+        # "on" for the normal run; predict_unmasked.smk reuses the rule with "off"
+        softmask = "on"
     threads: int(config['slurm_args']['cpus_per_task'])
     resources:
         mem_mb=int(config['slurm_args']['mem_of_node']),
@@ -168,7 +170,7 @@ rule fix_in_frame_stop_codons:
         # Create local symlink to genome to allow index file creation
         LOCAL_GENOME={params.output_dir}/genome.fa
         if [ ! -e "$LOCAL_GENOME" ]; then
-            ln -s {input.genome} $LOCAL_GENOME
+            ln -s "$(readlink -f {input.genome})" $LOCAL_GENOME
         fi
 
         # Check if there are any bad genes to fix
@@ -203,7 +205,7 @@ rule fix_in_frame_stop_codons:
                 -b {input.bad_genes} \
                 -o {params.fix_stem} \
                 -s {params.species_name} \
-                -m on \
+                -m {params.softmask} \
                 -u off \
                 -U off \
                 -a {params.aug_config} \

@@ -75,6 +75,7 @@ _env_overrides = {
     'BRAKER4_RUN_NCRNA':                      ('PARAMS', 'run_ncrna'),
     'BRAKER4_TRNASCAN_HIGH_CONFIDENCE_FILTER': ('PARAMS', 'trnascan_high_confidence_filter'),
     'BRAKER4_RUN_BEST_BY_COMPLEASM':          ('PARAMS', 'run_best_by_compleasm'),
+    'BRAKER4_PREDICT_UNMASKED':               ('PARAMS', 'predict_unmasked'),
     'BRAKER4_MASKING_TOOL':                   ('PARAMS', 'masking_tool'),
     'BRAKER4_USE_MINISPLICE':                 ('PARAMS', 'use_minisplice'),
     'BRAKER4_USE_VARUS':                      ('PARAMS', 'use_varus'),
@@ -384,6 +385,12 @@ config['trnascan_high_confidence_filter'] = config_parser.getboolean(
 
 config['run_best_by_compleasm'] = config_parser.getboolean(
     'PARAMS', 'run_best_by_compleasm', fallback=True
+)
+
+# Second AUGUSTUS prediction on the unmasked genome, as an extra TSEBRA
+# candidate set (rules/augustus_predict/predict_unmasked.smk). Off by default.
+config['predict_unmasked'] = config_parser.getboolean(
+    'PARAMS', 'predict_unmasked', fallback=False
 )
 
 config['masking_tool'] = config_parser.get(
@@ -716,6 +723,15 @@ include: "rules/augustus_training/compute_flanking_region.smk"
 include: "rules/postprocessing/merge_hints.smk"
 include: "rules/augustus_predict/run_augustus_hints.smk"
 include: "rules/postprocessing/fix_in_frame_stop_codons.smk"
+
+# AUGUSTUS on the unmasked genome (predict_unmasked = 1); used by TSEBRA in
+# etp / isoseq / dual mode only, ignored with a warning for other modes
+if config['predict_unmasked']:
+    include: "rules/augustus_predict/predict_unmasked.smk"
+    _no_unmasked = [s for s in SAMPLES if get_braker_mode(s) not in ('etp', 'isoseq', 'dual')]
+    if _no_unmasked:
+        print(f"WARNING: predict_unmasked = 1 has no effect for {', '.join(_no_unmasked)} "
+              f"(only etp, isoseq and dual mode filter AUGUSTUS in TSEBRA)", file=sys.stderr)
 
 # Include AUGUSTUS iteration 2 for EP mode (ProtHint refinement); ETP samples
 # can fall back to EP mode

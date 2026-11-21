@@ -53,6 +53,11 @@ def _get_collect_inputs(wildcards):
     if config.get('run_omark', False):
         inputs["omark"] = f"output/{sample}/omark/omark_summary.txt"
 
+    # predict_unmasked = 1: provenance of the final transcripts (masked /
+    # unmasked_only / unmatched); unmasked_candidate_gtf is in run_tsebra.smk
+    if unmasked_candidate_gtf(sample):
+        inputs["unmasked_provenance"] = f"output/{sample}/unmasked/provenance.tsv"
+
     if types.get('has_reference_gtf'):
         inputs["gffcompare"] = f"output/{sample}/gffcompare/gffcompare.stats"
 
@@ -280,6 +285,13 @@ rule collect_results:
                 fi
             done
             echo "[INFO] Collected ncRNA annotations"
+        fi
+
+        # Provenance of the final transcripts (predict_unmasked = 1)
+        if [ -f "$OUTDIR/unmasked/provenance.tsv" ]; then
+            mkdir -p "$RESULTS/unmasked"
+            cp "$OUTDIR/unmasked/provenance.tsv" "$OUTDIR/unmasked/provenance_summary.txt" "$RESULTS/unmasked/"
+            echo "[INFO] Collected unmasked-prediction provenance"
         fi
 
         # GFF3 for ENA decoupled annotation (if ena_locus_tag_prefix is set).

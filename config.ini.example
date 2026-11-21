@@ -116,6 +116,13 @@ run_ncrna = 0
 trnascan_high_confidence_filter = 0
 ; Set to 0 to disable the rescue of dropped BUSCO genes after TSEBRA merge.
 run_best_by_compleasm = 1
+; Set to 1 to predict a second time with AUGUSTUS on the unmasked genome
+; (same trained parameters and hints, --softmasking=0) and give these genes
+; to TSEBRA as an extra candidate set. Recovers genes truncated or missed
+; because exons overlap masked sequence; TSEBRA keeps an unmasked model only
+; where the evidence supports it. etp / isoseq / dual mode only. Provenance:
+; results/unmasked/provenance.tsv.
+predict_unmasked = 0
 ; Repeat masking engine: "repeatmasker" (default) or "red" (faster, less detailed).
 masking_tool = repeatmasker
 ; Set to 1 to score splice sites with minisplice before minimap2 (IsoSeq mode only).
