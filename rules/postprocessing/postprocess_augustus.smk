@@ -154,7 +154,7 @@ rule assess_completeness:
         mem_mb=int(config['slurm_args']['mem_of_node']),
         runtime=int(config['slurm_args']['max_runtime'])
     container:
-        BRAKER3_CONTAINER
+        COMPLEASM_CONTAINER
     shell:
         r"""
         export PATH=/opt/conda/bin:$PATH
@@ -276,7 +276,9 @@ rule generate_statistics:
         bonafide_gb = "output/{sample}/bonafide.f.clean.gb",
         gb_train = "output/{sample}/train.gb.train",
         gb_train_train = "output/{sample}/train.gb.train.train",
-        compleasm_genome_summary = "output/{sample}/compleasm_genome_out/summary.txt",
+        # empty when run_genome_compleasm = 0
+        compleasm_genome_summary = lambda w: ([f"output/{w.sample}/compleasm_genome_out/summary.txt"]
+                                              if config.get('run_genome_compleasm', True) else []),
         compleasm_proteins_summary = "output/{sample}/compleasm_proteins/summary.txt",
         hintsfile = "output/{sample}/hintsfile.gff"
     output:
@@ -462,7 +464,11 @@ EOF
 
         # Genome-level compleasm results
         echo "Genome-level assessment (compleasm on genome sequence):" >> {output.statistics}
-        cat "{input.compleasm_genome_summary}" >> {output.statistics}
+        if [ -n "{input.compleasm_genome_summary}" ]; then
+            cat "{input.compleasm_genome_summary}" >> {output.statistics}
+        else
+            echo "not run (run_genome_compleasm = 0)" >> {output.statistics}
+        fi
         echo "" >> {output.statistics}
 
         # Protein-level compleasm results

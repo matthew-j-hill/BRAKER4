@@ -76,6 +76,7 @@ _env_overrides = {
     'BRAKER4_TRNASCAN_HIGH_CONFIDENCE_FILTER': ('PARAMS', 'trnascan_high_confidence_filter'),
     'BRAKER4_RUN_BEST_BY_COMPLEASM':          ('PARAMS', 'run_best_by_compleasm'),
     'BRAKER4_PREDICT_UNMASKED':               ('PARAMS', 'predict_unmasked'),
+    'BRAKER4_RUN_GENOME_COMPLEASM':           ('PARAMS', 'run_genome_compleasm'),
     'BRAKER4_MASKING_TOOL':                   ('PARAMS', 'masking_tool'),
     'BRAKER4_USE_MINISPLICE':                 ('PARAMS', 'use_minisplice'),
     'BRAKER4_USE_VARUS':                      ('PARAMS', 'use_varus'),
@@ -147,6 +148,12 @@ _container_defaults = {
 }
 for _img_key, _img_default in _container_defaults.items():
     config[_img_key] = config_parser.get('containers', _img_key, fallback=_img_default)
+# compleasm for the protein-mode assessment of the final gene set
+# (assess_completeness). Defaults to the BRAKER3 image, which bundles
+# compleasm; set to a dedicated compleasm image (e.g. a local .sif) to choose
+# the compleasm version. The image needs python3 and compleasm(.py) in PATH.
+config['compleasm_image'] = config_parser.get('containers', 'compleasm_image',
+                                              fallback=config['braker3_image'])
 
 # When [SLURM_ARGS] cpus_per_task is missing from config.ini (typical for
 # local runs), fall back to workflow.cores so that `snakemake --cores N`
@@ -392,6 +399,18 @@ config['run_best_by_compleasm'] = config_parser.getboolean(
 config['predict_unmasked'] = config_parser.getboolean(
     'PARAMS', 'predict_unmasked', fallback=False
 )
+
+# compleasm on the genome sequence. Needed only for compleasm hints and the
+# best_by_compleasm rescue; with both off it is just a QC report entry and
+# can be skipped (run_genome_compleasm = 0).
+config['run_genome_compleasm'] = config_parser.getboolean(
+    'PARAMS', 'run_genome_compleasm', fallback=True
+)
+if not config['run_genome_compleasm'] and (config['use_compleasm_hints'] or config['run_best_by_compleasm']):
+    raise ValueError(
+        "run_genome_compleasm = 0 requires use_compleasm_hints = 0 and "
+        "run_best_by_compleasm = 0 (both use the genome-mode compleasm run)"
+    )
 
 config['masking_tool'] = config_parser.get(
     'PARAMS', 'masking_tool', fallback='repeatmasker'

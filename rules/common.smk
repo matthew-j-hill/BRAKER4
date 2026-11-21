@@ -970,6 +970,7 @@ AGAT_CONTAINER = config.get("agat_image", "docker://quay.io/biocontainers/agat:1
 BARRNAP_CONTAINER = config.get("pybarrnap_image", "docker://quay.io/biocontainers/pybarrnap:0.5.1--pyhdfd78af_0")
 BUSCO_CONTAINER = config.get("busco_image", "docker://ezlabgva/busco:v6.1.0_cv2")
 OMARK_CONTAINER = config.get("omark_image", "docker://quay.io/biocontainers/omark:0.4.1--pyh7e72e81_0")
+COMPLEASM_CONTAINER = config.get("compleasm_image", BRAKER3_CONTAINER)
 TETOOLS_CONTAINER = config.get("tetools_image", "docker://dfam/tetools:latest")
 VARUS_CONTAINER = config.get("varus_image", "docker://gaiusaugustus/pyvarus:v2.1.3")
 TRNASCAN_CONTAINER = config.get("trnascan_image", "docker://quay.io/biocontainers/trnascan-se:2.0.12--pl5321h031d066_0")

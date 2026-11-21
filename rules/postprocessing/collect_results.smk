@@ -48,7 +48,8 @@ def _get_collect_inputs(wildcards):
     # when use_compleasm_hints=0 (otherwise nothing else would reference its
     # outputs and the rule would be dropped, breaking the report's QC section).
     inputs["compleasm"] = f"output/{sample}/compleasm_proteins/summary.txt"
-    inputs["compleasm_genome"] = f"output/{sample}/compleasm_genome_out/summary.txt"
+    if config.get('run_genome_compleasm', True):
+        inputs["compleasm_genome"] = f"output/{sample}/compleasm_genome_out/summary.txt"
 
     if config.get('run_omark', False):
         inputs["omark"] = f"output/{sample}/omark/omark_summary.txt"
