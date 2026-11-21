@@ -195,10 +195,11 @@ rule fix_in_frame_stop_codons:
 
             # Run fix_in_frame_stop_codon_genes.py (local modified version)
             # Note: Using local script to control temp file locations
-            # -m on: BRAKER4 always soft-masks, so the re-prediction must
-            # honour repeat regions the same way the original AUGUSTUS run did.
-            # braker.pl picks -m on/off conditionally on $soft_mask; in BRAKER4
-            # the genome is always soft-masked, so the answer is always "on".
+            # -m (params.softmask): the re-prediction must treat repeat regions
+            # the same way the AUGUSTUS run it fixes did. braker.pl picks -m
+            # on/off conditionally on $soft_mask; the BRAKER4 genome is always
+            # soft-masked, so the normal run uses "on". predict_unmasked.smk
+            # reuses this rule with "off" for its unmasked prediction.
             python3 {script_dir}/fix_in_frame_stop_codon_genes.py \
                 -g $LOCAL_GENOME \
                 -t {input.gtf} \

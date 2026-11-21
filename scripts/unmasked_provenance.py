@@ -10,7 +10,7 @@ prefix      Prefix gene and transcript IDs of an AUGUSTUS GTF, so that the
 
 provenance  Label each transcript of the final gene set by the source gene
             sets that contain a transcript with the identical coding
-            structure (sequence, strand, all CDS intervals). Independent of
+            structure (sequence, strand, CDS plus stop codon intervals). Independent of
             the IDs, which TSEBRA and rename_gtf.py replace.
 
               unmasked_provenance.py provenance --final braker.gtf \\
@@ -39,9 +39,26 @@ GENE_RE = re.compile(r'gene_id "([^"]+)"')
 MASKED_SOURCES = ("masked_augustus", "genemark", "training")
 
 
+def _merge(intervals):
+    """Merge overlapping or adjacent (end + 1 == start) intervals."""
+    out = []
+    for start, end in sorted(intervals):
+        if out and start <= out[-1][1] + 1:
+            out[-1][1] = max(out[-1][1], end)
+        else:
+            out.append([start, end])
+    return tuple((a, b) for a, b in out)
+
+
 def cds_structures(path):
-    """transcript_id -> (seqid, strand, ((start, end), ...)), and transcript -> gene."""
-    cds = defaultdict(list)
+    """transcript_id -> (seqid, strand, coding intervals), and transcript -> gene.
+
+    Coding intervals are CDS plus stop_codon features, merged. Gene sets differ
+    in whether the stop codon is part of the CDS (GeneMark, AUGUSTUS) or only a
+    separate stop_codon feature (BRAKER's final braker.gtf after
+    normalize_cds trims it); the merged span is the same either way.
+    """
+    iv = defaultdict(list)
     where = {}
     gene_of = {}
     with open(path) as f:
@@ -49,18 +66,19 @@ def cds_structures(path):
             if line.startswith("#") or not line.strip():
                 continue
             c = line.rstrip("\n").split("\t")
-            if len(c) < 9 or c[2] != "CDS":
+            if len(c) < 9 or c[2] not in ("CDS", "stop_codon"):
                 continue
             m = TX_RE.search(c[8])
             if not m:
                 continue
             tx = m.group(1)
-            cds[tx].append((int(c[3]), int(c[4])))
-            where[tx] = (c[0], c[6])
-            g = GENE_RE.search(c[8])
-            if g:
-                gene_of[tx] = g.group(1)
-    keys = {tx: (where[tx][0], where[tx][1], tuple(sorted(iv))) for tx, iv in cds.items()}
+            iv[tx].append((int(c[3]), int(c[4])))
+            if c[2] == "CDS":
+                where[tx] = (c[0], c[6])
+                g = GENE_RE.search(c[8])
+                if g:
+                    gene_of[tx] = g.group(1)
+    keys = {tx: (where[tx][0], where[tx][1], _merge(iv[tx])) for tx in where}
     return keys, gene_of
 
 
