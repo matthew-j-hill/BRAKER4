@@ -136,7 +136,7 @@ rule run_genemark_etp_isoseq:
             # The whole GeneMark-ETP work dir (ProtHint logs and intermediate
             # files included), minus the staged inputs and files over 1 GB.
             mkdir -p "$finalDir/failed_run_debug/workdir"
-            ( cd "$outDir" && find . -type f -size -1G ! -name '*.bam' ! -name '*.bai' ! -name '*.csi' \
+            ( cd "$outDir" && find . -type f -size -1000M ! -name '*.bam' ! -name '*.bai' ! -name '*.csi' \
                   ! -path './etp_lr_data/*' ! -path './etp_sr_data/*' -print0 \
               | xargs -0 -r cp --parents -t "$finalDir/failed_run_debug/workdir/" ) 2>> "$LOG_ABS" || true
             echo "GeneMark-ETP work dir (files < 1 GB, no BAMs) copied to $finalDir/failed_run_debug/workdir/" >> "$LOG_ABS"
