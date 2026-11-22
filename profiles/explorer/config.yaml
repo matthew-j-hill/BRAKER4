@@ -1,7 +1,7 @@
 executor: slurm
 jobs: 75
 use-singularity: true
-singularity-args: '-B /home -B /projects -B /scratch --env "PREPEND_PATH=/opt/conda/bin"'
+singularity-args: '-B /home -B /projects --env "PREPEND_PATH=/opt/conda/bin"'
 latency-wait: 300
 restart-times: 2
 rerun-incomplete: true
@@ -11,8 +11,8 @@ default-resources:
   tmpdir: "'/tmp'"
 set-resources:
   check_bam_sorted:
-    slurm_partition: "short"
+    slurm_partition: "short,long"
     runtime: 240
   bam2hints:
-    slurm_partition: "short"
+    slurm_partition: "short,long"
     runtime: 240
