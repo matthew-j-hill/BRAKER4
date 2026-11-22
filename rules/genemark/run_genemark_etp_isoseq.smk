@@ -94,7 +94,15 @@ rule run_genemark_etp_isoseq:
         mkdir -p {params.outdir}
 
         finalDir=$(readlink -f {params.outdir})
-        rm -rf "$finalDir/failed_run_debug"
+        # Keep the debug files and log of a previous failed attempt (a retry
+        # would otherwise erase the only evidence of why it failed).
+        _stamp=$(date +%Y%m%d_%H%M%S)
+        if [ -d "$finalDir/failed_run_debug" ]; then
+            mv "$finalDir/failed_run_debug" "$finalDir/failed_run_debug.$_stamp"
+        fi
+        if [ -s {log} ]; then
+            mv {log} {log}.$_stamp
+        fi
         GENOME_ABS=$(readlink -f {input.genome})
         PROTEINS_ABS=$(readlink -f {input.proteins})
         LOG_ABS=$WORKDIR/{log}
@@ -125,6 +133,13 @@ rule run_genemark_etp_isoseq:
             mkdir -p "$finalDir/failed_run_debug"
             copy_back "$outDir" "$finalDir/failed_run_debug" "${{_dbg[@]}}"
             echo "Debug files (gms.log, etp_config.yaml, StringTie GFFs) copied to $finalDir/failed_run_debug/" >> "$LOG_ABS"
+            # The whole GeneMark-ETP work dir (ProtHint logs and intermediate
+            # files included), minus the staged inputs and files over 1 GB.
+            mkdir -p "$finalDir/failed_run_debug/workdir"
+            ( cd "$outDir" && find . -type f -size -1G ! -name '*.bam' ! -name '*.bai' ! -name '*.csi' \
+                  ! -path './etp_lr_data/*' ! -path './etp_sr_data/*' -print0 \
+              | xargs -0 -r cp --parents -t "$finalDir/failed_run_debug/workdir/" ) 2>> "$LOG_ABS" || true
+            echo "GeneMark-ETP work dir (files < 1 GB, no BAMs) copied to $finalDir/failed_run_debug/workdir/" >> "$LOG_ABS"
         }}
 
         BAM_IDS=""
