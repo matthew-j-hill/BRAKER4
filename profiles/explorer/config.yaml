@@ -6,13 +6,13 @@ latency-wait: 300
 restart-times: 2
 rerun-incomplete: true
 default-resources:
-  slurm_account: "jingke.weng"
-  slurm_partition: "long"
-  tmpdir: "/tmp"
+  slurm_account: "'jingke.weng'"
+  slurm_partition: "'long'"
+  tmpdir: "'/tmp'"
 set-resources:
   check_bam_sorted:
-    slurm_partition: "short"
+    slurm_partition: "'short'"
     runtime: 240
   bam2hints:
-    slurm_partition: "short"
+    slurm_partition: "'short'"
     runtime: 240
