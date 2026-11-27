@@ -32,14 +32,21 @@ Mode-by-mode behavior in this rule mirrors braker.pl:
 """
 
 
-def unmasked_candidate_gtf(sample):
-    """AUGUSTUS predictions on the unmasked genome (predict_unmasked = 1), or
-    None. Only ETP-style modes pass AUGUSTUS through TSEBRA as a candidate set
-    that is filtered against the hints; in ES/EP/ET every AUGUSTUS gene is
-    kept, so unmasked predictions would enter unfiltered and are not used."""
-    if config.get('predict_unmasked', False) and get_braker_mode(sample) in ('etp', 'isoseq', 'dual'):
-        return f"output/{sample}/unmasked/augustus.hints.fixed.prefixed.gtf"
-    return None
+def candidate_gtfs(sample):
+    """Extra TSEBRA candidate gene sets as [(label, gtf), ...]:
+    'unmasked' (AUGUSTUS on the unmasked genome, predict_unmasked = 1) and
+    one entry per [paths] extra_candidate_gtf set (e.g. a genomic language
+    model's predictions). Only ETP-style modes pass gene sets through TSEBRA
+    as candidates filtered against the hints; in ES/EP/ET every AUGUSTUS gene
+    is kept, so extra sets would enter unfiltered and are not used."""
+    if get_braker_mode(sample) not in ('etp', 'isoseq', 'dual'):
+        return []
+    sets = []
+    if config.get('predict_unmasked', False):
+        sets.append(("unmasked", f"output/{sample}/unmasked/augustus.hints.fixed.prefixed.gtf"))
+    for name in config.get('extra_candidates', {}):
+        sets.append((name, f"output/{sample}/candidates/{name}.gtf"))
+    return sets
 
 def get_tsebra_inputs(wildcards):
     """
@@ -85,9 +92,8 @@ def get_tsebra_inputs(wildcards):
             "hintsfile":  get_augustus_hintsfile(sample),
         })
 
-    unmasked = unmasked_candidate_gtf(sample)
-    if unmasked:
-        inputs["unmasked_gtf"] = unmasked
+    for label, gtf in candidate_gtfs(sample):
+        inputs[f"candidate_{label}"] = gtf
 
     return with_mode_decisions(wildcards, inputs)
 
@@ -103,8 +109,10 @@ rule run_tsebra:
     params:
         mode=lambda w: effective_mode_on_disk(w.sample),
         filter_se=config['filter_single_exon_genes'],
-        # ",<path>" when predict_unmasked = 1 (appended to the --gtf candidates)
-        extra_gtf=lambda w: ("," + unmasked_candidate_gtf(w.sample)) if unmasked_candidate_gtf(w.sample) else ""
+        # ",<path>,..." for the extra candidate sets (appended to --gtf), and
+        # "label=path ..." for the log
+        extra_gtf=lambda w: "".join("," + g for _, g in candidate_gtfs(w.sample)),
+        extra_labels=lambda w: " ".join(f"{l}={g}" for l, g in candidate_gtfs(w.sample))
     threads: 1
     resources:
         mem_mb=mem_single_thread,
@@ -152,11 +160,10 @@ rule run_tsebra:
                 GM_GENES=$(awk -F'\t' '$3=="CDS"' {input.genemark_gtf} | grep -oE 'gene_id "[^"]+"' | sort -u | wc -l)
                 KEEP_GENES=$(grep -oE 'gene_id "[^"]+"' {input.training_gtf} | sort -u | wc -l)
                 echo "[INFO] Inputs: AUGUSTUS=$AUG_GENES, GeneMark=$GM_GENES (candidates), training=$KEEP_GENES (forced)" | tee -a {output.tsebra_log}
-                if [ -n "{params.extra_gtf}" ]; then
-                    UNM_GTF="{params.extra_gtf}"; UNM_GTF=${{UNM_GTF#,}}
-                    UNM_GENES=$(awk '$3=="gene"{{n++}}END{{print n+0}}' "$UNM_GTF")
-                    echo "[INFO] Unmasked AUGUSTUS=$UNM_GENES (candidates, predict_unmasked = 1)" | tee -a {output.tsebra_log}
-                fi
+                for _kv in {params.extra_labels}; do
+                    _n=$(awk '$3=="gene"{{n++}}END{{print n+0}}' "${{_kv#*=}}")
+                    echo "[INFO] Extra candidate set ${{_kv%%=*}}=$_n genes" | tee -a {output.tsebra_log}
+                done
 
                 tsebra.py \
                     --gtf {input.augustus_gtf},{input.genemark_gtf}{params.extra_gtf} \

@@ -21,6 +21,7 @@ __version__ = "0.8.0-beta"
 import pandas as pd
 import configparser
 import os
+import re
 import sys
 
 # ============================================================================
@@ -77,6 +78,7 @@ _env_overrides = {
     'BRAKER4_RUN_BEST_BY_COMPLEASM':          ('PARAMS', 'run_best_by_compleasm'),
     'BRAKER4_PREDICT_UNMASKED':               ('PARAMS', 'predict_unmasked'),
     'BRAKER4_RUN_GENOME_COMPLEASM':           ('PARAMS', 'run_genome_compleasm'),
+    'BRAKER4_EXTRA_CANDIDATE_GTF':            ('paths', 'extra_candidate_gtf'),
     'BRAKER4_MASKING_TOOL':                   ('PARAMS', 'masking_tool'),
     'BRAKER4_USE_MINISPLICE':                 ('PARAMS', 'use_minisplice'),
     'BRAKER4_USE_VARUS':                      ('PARAMS', 'use_varus'),
@@ -399,6 +401,22 @@ config['run_best_by_compleasm'] = config_parser.getboolean(
 config['predict_unmasked'] = config_parser.getboolean(
     'PARAMS', 'predict_unmasked', fallback=False
 )
+
+# Extra TSEBRA candidate gene sets from other predictors, as
+# name:path[,name:path...] (GTF or GFF3; rules/postprocessing/candidate_sets.smk).
+# Filtered against the hints like AUGUSTUS and GeneMark; etp/isoseq/dual only.
+config['extra_candidates'] = {}
+for _entry in config_parser.get('paths', 'extra_candidate_gtf', fallback='').split(','):
+    _entry = _entry.strip()
+    if not _entry:
+        continue
+    _name, _sep, _path = _entry.partition(':')
+    if not _sep or not re.fullmatch(r'[A-Za-z0-9]+', _name) or _name == 'unmasked':
+        raise ValueError(f"extra_candidate_gtf: '{_entry}' is not name:path with an alphanumeric "
+                         f"name other than 'unmasked'")
+    if not os.path.isfile(_path):
+        raise ValueError(f"extra_candidate_gtf: file for '{_name}' not found: {_path}")
+    config['extra_candidates'][_name] = os.path.abspath(_path)
 
 # compleasm on the genome sequence. Needed only for compleasm hints and the
 # best_by_compleasm rescue; with both off it is just a QC report entry and
@@ -743,14 +761,17 @@ include: "rules/postprocessing/merge_hints.smk"
 include: "rules/augustus_predict/run_augustus_hints.smk"
 include: "rules/postprocessing/fix_in_frame_stop_codons.smk"
 
-# AUGUSTUS on the unmasked genome (predict_unmasked = 1); used by TSEBRA in
-# etp / isoseq / dual mode only, ignored with a warning for other modes
+# AUGUSTUS on the unmasked genome (predict_unmasked = 1) and extra candidate
+# gene sets (extra_candidate_gtf); used by TSEBRA in etp / isoseq / dual mode
+# only, ignored with a warning for other modes
 if config['predict_unmasked']:
     include: "rules/augustus_predict/predict_unmasked.smk"
-    _no_unmasked = [s for s in SAMPLES if get_braker_mode(s) not in ('etp', 'isoseq', 'dual')]
-    if _no_unmasked:
-        print(f"WARNING: predict_unmasked = 1 has no effect for {', '.join(_no_unmasked)} "
-              f"(only etp, isoseq and dual mode filter AUGUSTUS in TSEBRA)", file=sys.stderr)
+if config['predict_unmasked'] or config['extra_candidates']:
+    include: "rules/postprocessing/candidate_sets.smk"
+    _no_extra = [s for s in SAMPLES if get_braker_mode(s) not in ('etp', 'isoseq', 'dual')]
+    if _no_extra:
+        print(f"WARNING: predict_unmasked / extra_candidate_gtf have no effect for {', '.join(_no_extra)} "
+              f"(only etp, isoseq and dual mode filter candidate gene sets in TSEBRA)", file=sys.stderr)
 
 # Include AUGUSTUS iteration 2 for EP mode (ProtHint refinement); ETP samples
 # can fall back to EP mode

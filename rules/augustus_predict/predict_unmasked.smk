@@ -12,16 +12,14 @@ filtered against the hints like masked AUGUSTUS and GeneMark: an unmasked
 model is kept only where the evidence supports it at least as well as the
 alternatives. Only ETP-style modes (etp, isoseq, dual) filter AUGUSTUS in
 TSEBRA; in ES/EP/ET the unmasked set is not used (run_tsebra.smk,
-unmasked_candidate_gtf).
+candidate_gtfs).
 
 All files are under output/{sample}/unmasked/. The existing rules are reused
 with `use rule ... with:`, which replaces the directives listed here; input,
 output and params are given in full so the result does not depend on whether
 Snakemake merges or replaces them.
 
-Provenance: unmasked/provenance.tsv labels each transcript of the final
-braker.gtf as masked / unmasked_only / unmatched by identical CDS structure
-(scripts/unmasked_provenance.py); collect_results copies it to results/.
+Provenance of the final transcripts: rules/postprocessing/candidate_sets.smk.
 """
 
 
@@ -114,51 +112,4 @@ rule prefix_unmasked_ids:
         set -euo pipefail
         python3 {script_dir}/unmasked_provenance.py prefix \
             --gtf {input.gtf} --prefix unm_ --out {output.gtf}
-        """
-
-
-def _provenance_sources(wildcards):
-    """Gene sets the final transcripts are matched against. GeneMark and the
-    training genes come from the same mode-aware inputs as TSEBRA's."""
-    t = get_tsebra_inputs(wildcards)
-    return {
-        "final": f"output/{wildcards.sample}/braker.gtf",
-        "masked": f"output/{wildcards.sample}/augustus.hints.fixed.gtf",
-        "unmasked": f"output/{wildcards.sample}/unmasked/augustus.hints.fixed.prefixed.gtf",
-        "genemark": t["genemark_gtf"],
-        "training": t["training_gtf"],
-        # decisions of the automatic mode fallback, as for run_tsebra
-        "mode_decisions": mode_decision_files(wildcards),
-    }
-
-
-rule unmasked_provenance:
-    """
-    Label each transcript of the final gene set by the gene sets with the
-    identical CDS structure: masked (masked AUGUSTUS, GeneMark, training
-    genes), unmasked_only, or unmatched.
-    """
-    input:
-        unpack(_provenance_sources)
-    output:
-        tsv = "output/{sample}/unmasked/provenance.tsv",
-        summary = "output/{sample}/unmasked/provenance_summary.txt"
-    threads: 1
-    resources:
-        mem_mb=mem_single_thread,
-        runtime=int(config['slurm_args']['max_runtime'])
-    container:
-        BRAKER3_CONTAINER
-    shell:
-        r"""
-        export PATH=/opt/conda/bin:$PATH
-        export PYTHONNOUSERSITE=1
-        set -euo pipefail
-        python3 {script_dir}/unmasked_provenance.py provenance \
-            --final {input.final} \
-            --source masked_augustus={input.masked} \
-            --source unmasked_augustus={input.unmasked} \
-            --source genemark={input.genemark} \
-            --source training={input.training} \
-            --out {output.tsv} --summary {output.summary}
         """

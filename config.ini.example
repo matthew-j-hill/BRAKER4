@@ -16,6 +16,12 @@
 [paths]
 samples_file = samples.csv
 augustus_config_path = augustus_config
+; Extra TSEBRA candidate gene sets from other predictors (GTF or GFF3), as
+; name:path[,name:path...], e.g. vipsania:/path/to/vipsania.gff3. Each is
+; filtered against the hints like AUGUSTUS and GeneMark (etp / isoseq / dual
+; only); results/provenance/provenance.tsv labels which final transcripts come
+; only from it. The CDS is taken to include the stop codon (GFF3 convention).
+;extra_candidate_gtf =
 ; Node-local scratch root for the rules that write many or large temporary
 ; files (GeneMark, ProtHint, AUGUSTUS prediction and optimization, BUSCO,
 ; compleasm, VARUS, alignment and BAM sorting, SRA downloads, hint merging,
